@@ -117,7 +117,7 @@ class BinnedData(object):
             else:
                 idx1 = self.find_overlap_bin(chrom, pos)
                 idx2 = self.find_overlap_bin(chrom2, pos2)
-            if idx1 is not None and idx2 is not None
+            if idx1 is not None and idx2 is not None:
                 self.dat[idx1,idx2] += 1
                 self.dat[idx2,idx1] += 1
 
@@ -147,4 +147,4 @@ class BinnedData(object):
         for reg in self.bins:
             chrom,colon,coords = reg.partition(':')
             for b in self.bins[reg]:
-                print('{}\t{}\t{}'.format(chrom, *reg)
+                print('{}\t{}\t{}'.format(chrom, *reg))
