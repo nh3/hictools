@@ -7,6 +7,8 @@ from warnings import warn
 from collections import OrderedDict as ordict
 import sys
 import numpy as np
+import numpy.ma as ma
+from scipy.ndimage.filters import gaussian_filter
 
 
 class BinnedData(object):
@@ -148,3 +150,87 @@ class BinnedData(object):
             chrom,colon,coords = reg.partition(':')
             for b in self.bins[reg]:
                 print('{}\t{}\t{}'.format(chrom, *reg))
+
+
+    def clean(self, bottom=1e-2, top=5e-4):
+        nbin = len(self.dat)
+        bottom_n = int(nbin*bottom)
+        top_n = int(nbin*(1-top))                                                                                                                                                                                                     
+        rowSum = self.dat.sum(axis=1)
+        k = np.sort(rowSum.argsort()[bottom_n:top_n])
+        k_remove = np.array(tuple(set(range(nbin))-set(k)))
+        mask = np.zeros((nbin,nbin))
+        mask[k_remove,] = 1
+        mask[...,k_remove] = 1
+        self.clean_dat = ma.array(self.dat, mask=mask)
+        return k_remove
+
+
+    def gaussian_smooth(self, stdev):
+        self.smoothed_dat = gaussian_filter(self.dat, stdev)
+
+
+    @staticmethod
+    def calc_insulation(dat, dist_range, delta_size):
+        nbin = len(dat)
+        min_d,max_d = dist_range
+        if min_d < 0 or max_d < min_d:
+            raise ValueError('calc_insulation() requires 0 <= min_d <= max_d')
+        insulation = ma.zeros(nbin)
+        for i in xrange(nbin):
+            if i < max_d or i >= nbin-max_d:
+                insulation[i] = -1
+            else:
+                insulation[i] = dat[i,(i-max_d):(i-min_d)].sum() + dat[i,(i+min_d):(i+max_d)].sum()
+        k = insulation > 0
+        insulation[k] = ma.log2(insulation[k]/insulation[k].mean())
+        insulation[~k] = 0
+        delta = ma.zeros(nbin)
+        for i in xrange(nbin):
+            if i < delta_size:
+                delta[i] = insulation[0] - insulation[i+delta_size]
+            elif i >= nbin - delta_size:
+                delta[i] = insulation[i-delta_size] - insulation[nbin-1] 
+            else:
+                delta[i] = insulation[i-delta_size]-insulation[i+delta_size]
+        return insulation,delta
+
+
+    @staticmethod
+    def calc_directionality(dat, dist_range):
+        nbin = len(dat)
+        min_d,max_d = dist_range
+        if min_d < 0 or max_d < min_d:
+            raise ValueError('calc_insulation() requires 0 <= min_d <= max_d')
+        directionality = ma.zeros(nbin)
+        for i in xrange(nbin):
+            if i < max_d or i >= nbin-max_d:
+                directionality[i] = 0.0
+            else:
+                up = dat[i,(i-max_d):(i-min_d)].sum()
+                down = dat[i,(i+min_d):(i+max_d)].sum()
+                avg = (up+down)/2.0
+                directionality[i] = (up-down)/ma.abs(up-down)*((up-avg)**2/avg + (down-avg)**2/avg)
+        return directionality
+
+
+    @staticmethod
+    def iteractive_correction(dat, max_iter=100, tolerance=1e-5):
+        totalBias = ma.ones(len(dat), float)
+        mat = dat.copy()
+        for r in xrange(max_iter):
+            print('.', end='', file=sys.stderr)
+            binSum = mat.sum(axis=1)
+            mask = binSum==0
+            bias = binSum/binSum[~mask].mean()
+            bias[mask] = 1
+            bias -= 1
+            bias *= 0.8
+            bias += 1
+            totalBias *= bias
+            biasMat = bias.reshape(1,len(bias)) * bias.reshape(len(bias),1)
+            mat = mat / biasMat
+            if ma.abs(bias-1).max() < tolerance:
+                break
+        corr = totalBias[~mask].mean()
+        return mat,corr
