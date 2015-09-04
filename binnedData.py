@@ -69,6 +69,15 @@ class BinnedData(object):
         self.regions = np.array(parsed_regions, dtype=[('chrom','a32'),('start','i4'),('end','i4')])
 
 
+    def iter_bins(self):
+        i = -1
+        for reg in self.bins:
+            chrom,colon,coords = reg.partition(':')
+            for b in self.bins[reg]:
+                i += 1
+                yield i,chrom,b
+
+
     def make_bins(self):
         '''generate bins of a given resolution, with the constraint of region/chromosome sizes'''
         if self.regions is None:
@@ -79,11 +88,11 @@ class BinnedData(object):
         for region in self.regions:
             reg = '{}:{}-{}'.format(*region)
             if self.resolution is not None:
-                bin_starts = np.arange(region[1], region[2], self.resolution)
+                bin_starts = np.arange(region[1], region[2], self.resolution, dtype=int)
                 bin_ends = np.append(bin_starts[1:], region[2])
             else:
-                bin_starts = np.array([region[1]])
-                bin_ends = np.array([region[2]])
+                bin_starts = np.array([region[1]], dtype=int)
+                bin_ends = np.array([region[2]], dtype=int)
             offsets[reg] = nbin
             bins[reg] = np.vstack((bin_starts,bin_ends,bin_ends-bin_starts)).transpose()
             nbin += len(bins[reg])
@@ -141,18 +150,32 @@ class BinnedData(object):
         np.savetxt(outfile, self.dat, fmt='%.2e', delimiter='\t')
 
 
+    def write_circos_links(self, outfile, clean=True):
+        if clean:
+            dat = self.clean_dat
+        else:
+            dat = self.dat
+        if type(outfile) is file:
+            f = outfile
+        elif type(outfile) is str:
+            f = open(outfile, 'w')
+        for i,chrom1,b1 in self.iter_bins():
+            for j,chrom2,b2 in self.iter_bins():
+                if j>i:
+                    count = dat[i,j]
+                    print('{}\t{:d}\t{:d}\t{}\t{:d}\t{:d}\tthichness={}'.format(chrom1,b1[0],b1[1],chrom2,b2[0],b2[1],count), file=f)
+
+
     def write_bins(self, outfile):
         if type(outfile) is file:
             f = outfile
         elif type(outfile) is str:
             f = open(outfile, 'w')
-        for reg in self.bins:
-            chrom,colon,coords = reg.partition(':')
-            for b in self.bins[reg]:
-                print('{}\t{}\t{}'.format(chrom, *reg))
+        for i,chrom,b in self.iter_bins():
+            print('{}\t{}\t{}'.format(chrom, *b))
 
 
-    def clean(self, bottom=1e-2, top=5e-4):
+    def clean(self, bottom=1e-2, top=5e-3):
         nbin = len(self.dat)
         bottom_n = int(nbin*bottom)
         top_n = int(nbin*(1-top))                                                                                                                                                                                                     
