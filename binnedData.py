@@ -123,8 +123,8 @@ class BinnedData(object):
             if chrom2 == '*':
                 continue
             if self.genomewide:
-                reg = '{}:{}-{}'.format(chrom,0,chrom_size[chrom])
-                reg2 = '{}:{}-{}'.format(chrom2,0,chrom_size[chrom2])
+                reg = '{}:{}-{}'.format(chrom,0,self.chrom_size[chrom])
+                reg2 = '{}:{}-{}'.format(chrom2,0,self.chrom_size[chrom2])
                 idx1 = self.offsets[reg] + int(pos)/resolution
                 idx2 = self.offsets[reg2] + int(pos2)/resolution
             else:
