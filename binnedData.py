@@ -163,7 +163,7 @@ class BinnedData(object):
             for j,chrom2,b2 in self.iter_bins():
                 if j>i:
                     count = dat[i,j]
-                    print('{}\t{:d}\t{:d}\t{}\t{:d}\t{:d}\tthichness={}'.format(chrom1,b1[0],b1[1],chrom2,b2[0],b2[1],count), file=f)
+                    print('{}\t{:d}\t{:d}\t{}\t{:d}\t{:d}\tvalue={}'.format(chrom1,b1[0],b1[1],chrom2,b2[0],b2[1],count), file=f)
 
 
     def write_bins(self, outfile):
