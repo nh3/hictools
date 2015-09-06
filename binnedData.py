@@ -116,17 +116,20 @@ class BinnedData(object):
 
 
     def read_sam(self, samfh):
+        self.fill_zero()
         for line in samfh:
             if line[0] == '@':
                 continue
             rname,flag,chrom,pos,mapq,cigar,chrom2,pos2,dist,other = line.rstrip().split('\t', 9)
             if chrom2 == '*':
                 continue
+            elif chrom2 == '=':
+                chrom2 = chrom
             if self.genomewide:
                 reg = '{}:{}-{}'.format(chrom,0,self.chrom_size[chrom])
                 reg2 = '{}:{}-{}'.format(chrom2,0,self.chrom_size[chrom2])
-                idx1 = self.offsets[reg] + int(pos)/resolution
-                idx2 = self.offsets[reg2] + int(pos2)/resolution
+                idx1 = self.offsets[reg] + int(pos)/self.resolution
+                idx2 = self.offsets[reg2] + int(pos2)/self.resolution
             else:
                 idx1 = self.find_overlap_bin(chrom, pos)
                 idx2 = self.find_overlap_bin(chrom2, pos2)
