@@ -150,11 +150,7 @@ class BinnedData(object):
         np.savetxt(outfile, self.dat, fmt='%.2e', delimiter='\t')
 
 
-    def write_circos_links(self, outfile, clean=True):
-        if clean:
-            dat = self.clean_dat
-        else:
-            dat = self.dat
+    def write_circos_links(self, outfile=sys.stdout):
         if type(outfile) is file:
             f = outfile
         elif type(outfile) is str:
@@ -162,7 +158,7 @@ class BinnedData(object):
         for i,chrom1,b1 in self.iter_bins():
             for j,chrom2,b2 in self.iter_bins():
                 if j>i:
-                    count = dat[i,j]
+                    count = self.dat[i,j]
                     print('{}\t{:d}\t{:d}\t{}\t{:d}\t{:d}\tvalue={}'.format(chrom1,b1[0],b1[1],chrom2,b2[0],b2[1],count), file=f)
 
 
@@ -185,12 +181,34 @@ class BinnedData(object):
         mask = np.zeros((nbin,nbin))
         mask[k_remove,] = 1
         mask[...,k_remove] = 1
-        self.clean_dat = ma.array(self.dat, mask=mask)
+        self.raw_dat = self.dat.copy()
+        self.dat = ma.array(self.dat, mask=mask)
         return k_remove
 
 
     def gaussian_smooth(self, stdev):
         self.smoothed_dat = gaussian_filter(self.dat, stdev)
+
+
+    def iteractive_correction(self, max_iter=100, tolerance=1e-5):
+        totalBias = ma.ones(self.nbin, float)
+        mat = self.dat.copy()
+        for r in xrange(max_iter):
+            print('.', end='', file=sys.stderr)
+            binSum = mat.sum(axis=1)
+            mask = binSum==0
+            bias = binSum/binSum[~mask].mean()
+            bias[mask] = 1
+            bias -= 1
+            bias *= 0.8
+            bias += 1
+            totalBias *= bias
+            biasMat = bias.reshape(1,len(bias)) * bias.reshape(len(bias),1)
+            mat = mat / biasMat
+            if ma.abs(bias-1).max() < tolerance:
+                break
+        self.dat = mat
+        self.corr = totalBias[~mask].mean()
 
 
     @staticmethod
@@ -235,25 +253,3 @@ class BinnedData(object):
                 avg = (up+down)/2.0
                 directionality[i] = (up-down)/ma.abs(up-down)*((up-avg)**2/avg + (down-avg)**2/avg)
         return directionality
-
-
-    @staticmethod
-    def iteractive_correction(dat, max_iter=100, tolerance=1e-5):
-        totalBias = ma.ones(len(dat), float)
-        mat = dat.copy()
-        for r in xrange(max_iter):
-            print('.', end='', file=sys.stderr)
-            binSum = mat.sum(axis=1)
-            mask = binSum==0
-            bias = binSum/binSum[~mask].mean()
-            bias[mask] = 1
-            bias -= 1
-            bias *= 0.8
-            bias += 1
-            totalBias *= bias
-            biasMat = bias.reshape(1,len(bias)) * bias.reshape(len(bias),1)
-            mat = mat / biasMat
-            if ma.abs(bias-1).max() < tolerance:
-                break
-        corr = totalBias[~mask].mean()
-        return mat,corr
