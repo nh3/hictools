@@ -119,7 +119,7 @@ class BinnedData(object):
         for line in samfh:
             if line[0] == '@':
                 continue
-            rname,flag,chrom,pos,mapq,cigar,chrom2,pos2,dist,other = line.rstrip().split('\t', maxsplit=9)
+            rname,flag,chrom,pos,mapq,cigar,chrom2,pos2,dist,other = line.rstrip().split('\t', 9)
             if chrom2 == '*':
                 continue
             if self.genomewide:
