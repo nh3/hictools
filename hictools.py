@@ -5,6 +5,7 @@ import sys
 import os
 import errno
 import re
+import gzip
 import numpy as np
 import numpy.ma as ma
 from binnedData import BinnedData
@@ -37,22 +38,30 @@ def sam2mat_main(args):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise(e)
-    bin_outfile = os.path.join(args.outdir, 'bins.txt')
-    contact_outfile = os.path.join(args.outdir, 'contacts.txt')
-    bin_f = open(bin_outfile, 'w')
-    contact_f = open(contact_outfile, 'w')
+    bin_outfile = os.path.join(args.outdir, 'bins.txt.gz')
+    contact_outfile = os.path.join(args.outdir, 'contacts.txt.gz')
+    matrix_outfile = os.path.join(args.outdir, 'matrix.txt.gz')
+    bin_f = gzip.open(bin_outfile, 'wb')
+    contact_f = gzip.open(contact_outfile, 'wb')
+    matrix_f = gzip.open(matrix_outfile, 'wb')
 
     for i,chrom1,b1 in bdata.iter_bins():
         bin_mid1 = (b1[0]+b1[1])/2
-        print('{}\t{}\t{}\t{}\t{}'.format(chrom1,0,bin_mid1,margins[i],int(not ma.is_masked(margins[i]))), file=bin_f)
+        if ma.is_masked(margins[i]):
+            margin = 0
+        else:
+            margin = int(margins[i])
+        print('{}\t{}\t{}\t{}\t{}'.format(chrom1,0,bin_mid1,margin,int(margin>0)), file=bin_f)
+        print('\t'.join(bdata.dat.data[i].astype(str)), file=matrix_f)
         for j,chrom2,b2 in bdata.iter_bins():
             bin_mid2 = (b2[0]+b2[1])/2
             contact = bdata.dat[i,j]
             if j>i and not ma.is_masked(contact) and contact > 0:
-                print('{}\t{}\t{}\t{}\t{}'.format(chrom1,bin_mid1,chrom2,bin_mid2,contact), file=contact_f)
+                print('{}\t{}\t{}\t{}\t{}'.format(chrom1,bin_mid1,chrom2,bin_mid2,int(contact)), file=contact_f)
 
     bin_f.close()
     contact_f.close()
+    matrix_f.close()
 
 
 if __name__ == '__main__':
