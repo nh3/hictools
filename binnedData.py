@@ -126,11 +126,13 @@ class BinnedData(object):
                 continue
             elif chrom2 == '=':
                 chrom2 = chrom
+            pos = int(pos)
+            pos2 = int(pos2)
             if self.genomewide:
                 reg = '{}:{}-{}'.format(chrom,0,self.chrom_size[chrom])
                 reg2 = '{}:{}-{}'.format(chrom2,0,self.chrom_size[chrom2])
-                idx1 = self.offsets[reg] + int(pos)/self.resolution
-                idx2 = self.offsets[reg2] + int(pos2)/self.resolution
+                idx1 = self.offsets[reg] + pos/self.resolution
+                idx2 = self.offsets[reg2] + pos2/self.resolution
             else:
                 idx1 = self.find_overlap_bin(chrom, pos)
                 idx2 = self.find_overlap_bin(chrom2, pos2)
