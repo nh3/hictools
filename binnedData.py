@@ -109,6 +109,7 @@ class BinnedData(object):
             self.dat = mat
         else:
             raise ValueError('unmatched dimensions')
+        self.cleaned = False
 
 
     def fill_zero(self):
@@ -136,6 +137,8 @@ class BinnedData(object):
             if idx1 is not None and idx2 is not None:
                 self.dat[idx1,idx2] += 1
                 self.dat[idx2,idx1] += 1
+        self.cleaned = False
+        self.corrected = 0x0
 
 
     def find_overlap_bin(self, chrom, pos):
@@ -188,6 +191,7 @@ class BinnedData(object):
         mask[...,k_remove] = 1
         self.raw_dat = self.dat.copy()
         self.dat = ma.array(self.dat, mask=mask)
+        self.cleaned = True
         return k_remove
 
 
@@ -214,6 +218,7 @@ class BinnedData(object):
                 break
         self.dat = mat
         self.corr = totalBias[~mask].mean()
+        self.corrected |= 0x1
 
 
     @staticmethod
@@ -258,3 +263,20 @@ class BinnedData(object):
                 avg = (up+down)/2.0
                 directionality[i] = (up-down)/ma.abs(up-down)*((up-avg)**2/avg + (down-avg)**2/avg)
         return directionality
+
+
+    def correct_by_distance(self):
+        nbin = len(self.dat)
+        r = c = np.arange(nbin)
+        for k in range(1,n):
+            rr = r[:-k]
+            cc = c[k:]
+            kth_diag = self.dat.diagonal(k)
+            avg = kth_diag.sum()/(nbin-k)
+            if avg == 0:
+                ratio = np.ones(len(rr))
+            else:
+                ratio = kth_diag/avg
+            self.dat[rr,cc] = ratio
+            self.dat[cc,rr] = ratio
+        self.corrected |= 0x2
