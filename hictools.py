@@ -12,26 +12,32 @@ from binnedData import BinnedData
 
 
 def sam2mat_main(args):
-    if args.region is not None:
-        region_pattern = r'^[^:]+(?::\d+-\d+)?(?:,[^:]+(?::\d+-\d+)?)?$'
-        if re.search(region_pattern, args.region):
-            regions = args.region
-        else:
-            with open(args.region) as f:
-                regions = [line.rstrip() for line in f]
+    region_pattern = r'^[^:]+(?::\d+-\d+)?(?:,[^:]+(?::\d+-\d+)?)?$'
+    if args.region is not None and re.search(region_pattern, args.region):
+        regions = args.region
+    elif args.reglist is not None:
+        with open(args.reglist) as f:
+            regions = [line.rstrip() for line in f]
     else:
         regions = None
-
-    bdata = BinnedData(args.fai, regions=regions, resolution=args.resolution)
 
     if args.insam is None:
         sam_fh = sys.stdin
     else:
         sam_fh = open(args.insam, 'r')
 
+    bdata = BinnedData(args.fai, regions=regions, resolution=args.resolution)
     bdata.read_sam(sam_fh)
-    bdata.clean()
+    sam_fh.close()
+
+    if args.clean:
+        bdata.clean()
+    if args.ice:
+        bdata.iterative_correction()
+
     margins = bdata.dat.sum(axis=0)
+    #print(margins)
+    #sys.exit()
 
     try:
         os.makedirs(args.outdir)
@@ -52,7 +58,10 @@ def sam2mat_main(args):
         else:
             margin = int(margins[i])
         print('{}\t{}\t{}\t{}\t{}'.format(chrom1,0,bin_mid1,margin,int(margin>0)), file=bin_f)
-        print('\t'.join(bdata.dat.data[i].astype(str)), file=matrix_f)
+        if bdata.cleaned:
+            print('\t'.join(bdata.dat.data[i].astype(str)), file=matrix_f)
+        else:
+            print('\t'.join(bdata.dat[i].astype(str)), file=matrix_f)
         for j,chrom2,b2 in bdata.iter_bins():
             bin_mid2 = (b2[0]+b2[1])/2
             contact = bdata.dat[i,j]
@@ -72,10 +81,13 @@ if __name__ == '__main__':
 
     parser_sam2mat = subp.add_parser('sam2mat', help='extract contact matrix from SAM')
     parser_sam2mat.add_argument('-g', '--genome', metavar='FAI', dest='fai', type=str, required=True, help='genome.fa.fai')
-    parser_sam2mat.add_argument('-r', '--region', metavar='FILE or chr[:start-end]', dest='region', type=str, default=None, help='region(s) as a file or comma-separated string')
-    parser_sam2mat.add_argument('-R', '--res', metavar='INT', dest='resolution', type=int, default=1e4, help='resolution in bp, default 10000')
+    parser_sam2mat.add_argument('-r', '--region', metavar='chr[:start-end]', dest='region', type=str, default=None, help='region(s) as a comma-separated string')
+    parser_sam2mat.add_argument('-R', '--reglist', metavar='FILE', dest='reglist', type=str, default=None, help='a list of regions (chr[:start-end])')
+    parser_sam2mat.add_argument('-e', '--res', metavar='INT', dest='resolution', type=int, default=1e4, help='resolution in bp, default 10000')
     parser_sam2mat.add_argument('-i', '--input', metavar='SAM', dest='insam', type=str, default=None, help='input SAM, default from stdin')
     parser_sam2mat.add_argument('-o', '--outdir', metavar='DIR', dest='outdir', type=str, default='.', help='output dir, default to "."')
+    parser_sam2mat.add_argument('-c', '--clean', metavar='', dest='clean', nargs='?', type=bool, default=False, help='clean contact matrix to remove outliers')
+    parser_sam2mat.add_argument('-C', '--ice', metavar='', dest='ice', nargs='?', type=bool, default=False, help='perform interactive correction')
     parser_sam2mat.set_defaults(func=sam2mat_main)
 
     try:

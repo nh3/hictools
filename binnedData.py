@@ -29,6 +29,7 @@ class BinnedData(object):
             except TypeError:
                 raise TypeError('[regions] expect a list of tuples: [("chrI",1,200), ("chrI",251,300), ... ]')
         self.make_bins()
+        print('{} bins at resolution of {}bp'.format(self.nbin, self.resolution), file=sys.stderr)
 
 
     @staticmethod
@@ -110,6 +111,7 @@ class BinnedData(object):
         else:
             raise ValueError('unmatched dimensions')
         self.cleaned = False
+        self.corrected = 0x0
 
 
     def fill_zero(self):
@@ -178,7 +180,7 @@ class BinnedData(object):
         elif type(outfile) is str:
             f = open(outfile, 'w')
         for i,chrom,b in self.iter_bins():
-            print('{}\t{}\t{}'.format(chrom, *b))
+            print('{}\t{}\t{}'.format(chrom, *b), file=f)
 
 
     def clean(self, bottom=1e-2, top=5e-3):
@@ -201,7 +203,7 @@ class BinnedData(object):
         self.smoothed_dat = gaussian_filter(self.dat, stdev)
 
 
-    def iteractive_correction(self, max_iter=100, tolerance=1e-5):
+    def iterative_correction(self, max_iter=100, tolerance=1e-5):
         totalBias = ma.ones(self.nbin, float)
         mat = self.dat.copy()
         for r in xrange(max_iter):
@@ -219,7 +221,8 @@ class BinnedData(object):
             if ma.abs(bias-1).max() < tolerance:
                 break
         self.dat = mat
-        self.corr = totalBias[~mask].mean()
+        corr = totalBias[~mask].mean()
+        self.bias = totalBias/corr
         self.corrected |= 0x1
 
 
